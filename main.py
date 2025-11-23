@@ -1,42 +1,28 @@
 import os
 from typing import List
 from dotenv import load_dotenv
-from langchain.agents import create_agent
-from langchain.tools import tool
-from langchain_core.messages  import HumanMessage # to invoke agents
-from langchain_openai import ChatOpenAI
-from langchain_ollama import ChatOllama
-from pydantic import BaseModel, Field #give base class in order to describe structure(data parsing, serialisation) and field allows us to add metadata(descriptions- helps llm know what to put in that field)
+from langchain_classic import hub# sharing prompts, agents created by community
+from langchain_classic.agents import AgentExecutor #runtime - make the calls or executor
+from langchain_classic.agents.react.agent import create_react_agent #built-in langchain chain - runnable object - recievs tools+ prompt(react)(resoning agent)
 from langchain_tavily import TavilySearch
+from langchain_classic.agents.react.agent import create_react_agent
+from langchain_ollama import ChatOllama
+
 load_dotenv()
 
-class Source(BaseModel):
-    """Schema for a source used by the agent"""
-    url:str = Field(description="The url of the source")
-
-class AgentResponse(BaseModel):
-    """Schema for agent response"""
-    answer:str = Field(description="The agent answer to the query")
-    sources : List[Source] = Field(default_factory=list, description="List of sources used to generate the answer")
-@tool
-def search(query:str)-> str:
-    """Search the customer database for records matching the query.
-
-    Args:
-        query: Search terms to look for
-        limit: Maximum number of results to return
-    """
-    print(f"search{query}")
-    return "weather in Tokyo is sunny"
 
 # llm = ChatOpenAI(model="llama3.2:1b")
 llm = ChatOllama(model="granite3-moe:1b")
 tools = [TavilySearch()]
-agent = create_agent(model=llm,tools=tools,response_format=AgentResponse)
+react_prompt = hub.pull("hwchase17/react")
+agent = create_react_agent(llm=llm,tools=tools,prompt=react_prompt)
+agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True,handle_parsing_errors=True)
+chain = agent_executor
 
 def main():
     print("Hello from langchain-course!")
-    result = agent.invoke({"messages":HumanMessage(content="what is weather in tokyo")})
+    
+    result = chain.invoke({"input": "search for 3 job postings for an ai engineer using langchain in the bay area on linkedin and list their details"})
     print(result)
 
 if __name__ == "__main__":
